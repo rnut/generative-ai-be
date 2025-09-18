@@ -1,0 +1,24 @@
+# Air configuration for hot reload
+root = "."
+_tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/workshop-be"
+  bin = "./tmp/workshop-be"
+  include_ext = ["go"]
+  exclude_dir = ["vendor", "tmp"]
+  delay = 100 # ms debounce
+  send_interrupt = true
+  kill_delay = 500
+
+[color]
+  app = "cyan"
+  build = "yellow"
+  main = "magenta"
+  runner = "green"
+
+[log]
+  time = true
+
+[misc]
+  clean_on_exit = true
