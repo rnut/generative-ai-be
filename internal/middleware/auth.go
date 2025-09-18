@@ -3,8 +3,9 @@ package middleware
 import (
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
 	"workshop-be/internal/auth"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 func AuthRequired() fiber.Handler {

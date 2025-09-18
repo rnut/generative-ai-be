@@ -1,0 +1,10 @@
+basePath: /
+info:
+  contact: {}
+  description: API for authentication workshop
+  title: Workshop BE API
+  version: "1.0"
+paths: {}
+schemes:
+- http
+swagger: "2.0"

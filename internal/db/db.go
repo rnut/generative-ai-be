@@ -41,8 +41,12 @@ func MustGet() *gorm.DB {
 }
 
 func Close() error {
-	if DB == nil {return nil}
+	if DB == nil {
+		return nil
+	}
 	sqlDB, err := DB.DB()
-	if err != nil {return fmt.Errorf("get raw db: %w", err)}
+	if err != nil {
+		return fmt.Errorf("get raw db: %w", err)
+	}
 	return sqlDB.Close()
 }

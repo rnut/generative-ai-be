@@ -45,29 +45,47 @@ type LoginOutput struct {
 }
 
 func (s *Service) Register(input RegisterInput) (*RegisterOutput, error) {
-	if !emailRegex.MatchString(input.Email) { return nil, ErrInvalidEmail }
-	if len(input.Password) < 8 { return nil, ErrPasswordTooShort }
+	if !emailRegex.MatchString(input.Email) {
+		return nil, ErrInvalidEmail
+	}
+	if len(input.Password) < 8 {
+		return nil, ErrPasswordTooShort
+	}
 	d := db.MustGet()
 	var count int64
 	d.Model(&User{}).Where("email = ?", input.Email).Count(&count)
-	if count > 0 { return nil, ErrEmailExists }
+	if count > 0 {
+		return nil, ErrEmailExists
+	}
 	h, err := password.Hash(input.Password)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	user := User{Email: input.Email, PasswordHash: h}
-	if err := d.Create(&user).Error; err != nil { return nil, err }
+	if err := d.Create(&user).Error; err != nil {
+		return nil, err
+	}
 	return &RegisterOutput{ID: user.ID, Email: user.Email, CreatedAt: user.CreatedAt}, nil
 }
 
 func (s *Service) Login(input LoginInput) (*LoginOutput, error) {
-	if input.Email == "" || input.Password == "" { return nil, ErrInvalidCredential }
+	if input.Email == "" || input.Password == "" {
+		return nil, ErrInvalidCredential
+	}
 	d := db.MustGet()
 	var user User
-	if err := d.Where("email = ?", input.Email).First(&user).Error; err != nil { return nil, ErrInvalidCredential }
-	if !password.Verify(user.PasswordHash, input.Password) { return nil, ErrInvalidCredential }
+	if err := d.Where("email = ?", input.Email).First(&user).Error; err != nil {
+		return nil, ErrInvalidCredential
+	}
+	if !password.Verify(user.PasswordHash, input.Password) {
+		return nil, ErrInvalidCredential
+	}
 	now := time.Now()
 	d.Model(&user).Update("last_login_at", &now)
 	expiry := 15 * time.Minute
 	token, err := GenerateToken(user.ID, user.Email, expiry)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return &LoginOutput{AccessToken: token, TokenType: "Bearer", ExpiresIn: int64(expiry.Seconds())}, nil
 }
