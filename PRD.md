@@ -1,5 +1,3 @@
-markdown
-// filepath: /Users/arnut.k/Documents/workshops/gen-ai/workshop-be/PRD.md
 # Product Requirements Document (PRD)
 ระบบ Backend สำหรับ Authentication + Documentation + SQLite (Go Fiber)
 
@@ -36,13 +34,20 @@ Table: users
 - updated_at (datetime)
 - last_login_at (nullable datetime)
 - is_active (boolean, default true)
+- first_name (string, nullable)            <-- added for Profile
+- last_name (string, nullable)             <-- added for Profile
+- phone (string, nullable, indexed)        <-- added for Profile (unique optional future)
+- membership_level (string, default 'Bronze')  <-- added (enum: Bronze|Silver|Gold|Platinum)
+- membership_code (string, unique, nullable)   <-- added (e.g. LBK001234)
+- points (integer, default 0)              <-- added (remaining points)
+- joined_at (datetime, nullable)           <-- added (วันที่สมัครสมาชิก shown in UI)
 
 (ไม่เก็บ: plaintext password, ไม่เก็บ salt แยก ถ้าใช้ bcrypt ซึ่งจัดการภายใน)
 
 ### 1.3 การเชื่อมต่อ
 - เปิด connection ตอน start
 - ตรวจสอบว่าไฟล์โฟลเดอร์ data/ มีอยู่ (หากไม่มีก็สร้าง)
-- Auto-migrate ด้วย GORM
+- Auto-migrate ด้วย GORM (จะเพิ่มคอลัมน์ใหม่อัตโนมัติเมื่อ deploy ฟีเจอร์ Profile)
 
 ### 1.4 Security / Compliance Notes
 - Password: ใช้ bcrypt (cost 12 หรือ >= default) หรือ argon2id (ถ้าเพิ่ม lib)
@@ -150,6 +155,77 @@ Header: Authorization: Bearer <token>
   "last_login_at": "2025-09-18T13:20:00Z"
 }
 
+### 3.5 Profile (ใหม่ตาม UI แนบ)
+ใช้สำหรับแสดงและแก้ไขข้อมูลโปรไฟล์สมาชิก (หน้าจอบัตรสมาชิก + ส่วนแก้ไขข้อมูลส่วนตัว + ข้อมูลบัญชี)
+
+#### 3.5.1 Fields ที่ Backend จัดการ
+- membership_level (READ ONLY จากระบบ / ไม่ให้แก้ผ่าน endpoint PUT) ค่า enum: Bronze, Silver, Gold, Platinum
+- membership_code (READ ONLY, สร้างครั้งเดียวตอน register หรือ provisioning ภายหลัง)
+- first_name (editable)
+- last_name (editable)
+- phone (editable)
+- email (READ ONLY ในหน้า profile เพื่อหลีกเลี่ยงผลกระทบ login; การเปลี่ยน email อยู่นอก scope)
+- points (READ ONLY แสดงแต้มคงเหลือ)
+- joined_at (READ ONLY วันที่สมัครสมาชิก / ถ้า null ใช้ created_at)
+
+#### 3.5.2 Endpoint
+1) GET /api/v1/profile
+Response 200:
+{
+  "id": 1,
+  "email": "somchai@example.com",
+  "first_name": "สมชาย",
+  "last_name": "ใจดี",
+  "phone": "081-234-5678",
+  "membership_level": "Gold",
+  "membership_code": "LBK001234",
+  "points": 15420,
+  "joined_at": "2023-06-15T00:00:00Z"
+}
+Errors: 401 (UNAUTHORIZED)
+
+2) PUT /api/v1/profile
+Request (เฉพาะ field ที่แก้ไขได้):
+{
+  "first_name": "สมชาย",
+  "last_name": "ใจดี",
+  "phone": "081-234-5678"
+}
+Validation:
+- first_name, last_name: optional; ถ้ามี length 1..100, trim whitespace
+- phone: optional; รูปแบบไทย 10 หลัก (อนุญาต - หรือ เว้นวรรค) normalize เก็บเฉพาะตัวเลข 10 หลัก (เช่น 0812345678)
+Behavior:
+- Partial update (field ที่ไม่ส่งจะไม่เปลี่ยน)
+- อัพเดต updated_at อัตโนมัติ
+Response 200:
+{ (structure เหมือน GET /api/v1/profile) }
+Errors:
+- 400 INVALID_PHONE / INVALID_NAME
+- 401 UNAUTHORIZED
+- 500 INTERNAL_ERROR
+
+#### 3.5.3 Business Rules
+- เปลี่ยน membership_level / points ผ่านระบบภายใน (future admin) ไม่ผ่าน endpoint นี้
+- ถ้า membership_code เป็นค่าว่างตอนเรียก GET สามารถคืน null หรือไม่ส่งคีย์ (เลือกแบบส่ง null เพื่อให้ frontend handle)
+- joined_at: หากว่างให้ frontend ใช้ created_at เป็น fallback
+- phone เก็บค่าสุทธิ (digits only) แต่ response ส่งรูปแบบที่เก็บ (ไม่ re-format) => เวอร์ชันแรก simplest: ส่ง digits only; frontend format เอง
+
+#### 3.5.4 Swagger Annotations (สรุป)
+- @Summary Get profile / Update profile
+- @Security BearerAuth ต้องเพิ่ม securityDefinitions:
+  securityDefinitions:
+    BearerAuth:
+      type: apiKey
+      name: Authorization
+      in: header
+  แล้วผูกกับ endpoints profile
+
+#### 3.5.5 Error Codes (Profile)
+- INVALID_PHONE
+- INVALID_NAME
+- UNAUTHORIZED
+- INTERNAL_ERROR
+
 ---
 
 ## 4. Documentation (Swagger / OpenAPI)
@@ -172,6 +248,23 @@ Header: Authorization: Bearer <token>
  // @Failure 409 {object} ErrorResponse
  // @Router /api/v1/auth/register [post]
 
+ // @Summary Get profile
+ // @Tags Profile
+ // @Security BearerAuth
+ // @Produce json
+ // @Success 200 {object} ProfileResponse
+ // @Router /api/v1/profile [get]
+
+ // @Summary Update profile
+ // @Tags Profile
+ // @Security BearerAuth
+ // @Accept json
+ // @Produce json
+ // @Param request body ProfileUpdateRequest true "profile update"
+ // @Success 200 {object} ProfileResponse
+ // @Failure 400 {object} ErrorResponse
+ // @Router /api/v1/profile [put]
+
 ### 4.3 Definition Objects
 - RegisterRequest
 - RegisterResponse
@@ -179,6 +272,8 @@ Header: Authorization: Bearer <token>
 - LoginResponse
 - ErrorResponse
 - UserMeResponse
+- ProfileResponse (ใหม่)
+- ProfileUpdateRequest (ใหม่)
 
 ---
 
@@ -228,6 +323,9 @@ Register:
 - password: required, length >= 8
 Login:
 - email + password required
+Profile Update:
+- first_name / last_name: ถ้าส่งต้อง length 1..100 (UTF-8) และ trim
+- phone: ถ้าส่ง ต้องมีตัวเลข 10 หลักหลัง normalize (ลบ non-digit) มิฉะนั้น INVALID_PHONE
 
 ---
 
@@ -249,6 +347,16 @@ Login:
 - Invalid token signature
 - Expired token
 
+### 7.4 Profile
+- GET profile success (มี/ไม่มี membership_code)
+- GET profile unauthorized (no token)
+- PUT profile success (เปลี่ยน first_name + phone)
+- PUT profile partial (ส่งเฉพาะ last_name)
+- PUT profile invalid phone
+- PUT profile invalid name (length 0)
+- PUT profile unauthorized
+- PUT profile does not change read-only fields (membership_level, points)
+
 ---
 
 ## 8. Future Enhancements (Backlog)
@@ -259,6 +367,9 @@ Login:
 - Audit log
 - Prometheus metrics
 - Docker + Compose (SQLite volume)
+- Upload profile avatar
+- Points transaction history endpoint
+- Admin endpoint ปรับปรุง membership_level / points
 
 ---
 
@@ -270,6 +381,7 @@ Login:
 - ข้อมูลถูกเก็บในไฟล์ SQLite
 - Password ไม่ถูกเก็บเป็น plaintext
 - โค้ดรันผ่าน: go run main.go แล้วใช้งานตามที่ระบุ
+- Profile: GET /api/v1/profile คืนค่าตาม spec และ PUT /api/v1/profile อัพเดต field ที่อนุญาตได้
 
 ---
 
@@ -277,6 +389,7 @@ Login:
 - JWT secret เผลอ commit → ใช้ .env + .gitignore
 - Race condition ตอน migrate (ต่ำมากใน single instance)
 - Token ไม่ revoke ได้ (ยอมรับสำหรับ MVP)
+- ข้อมูล phone format ไม่สอดคล้อง ถ้าไม่มี normalization (ลดด้วยการ normalize เก็บ digits)
 
 ---
 
@@ -286,5 +399,6 @@ Login:
 - Swagger สร้างสำเร็จ
 - Manual test ทุกกรณีหลักผ่าน
 - ไม่มี secret ใน repo
+- Profile endpoints พร้อมทดสอบตาม test cases 7.4
 
 ---

@@ -27,7 +27,9 @@ import (
 // @description API for authentication workshop
 // @BasePath /
 // @schemes http
-
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 func main() {
 	_ = godotenv.Load() // load .env if present
 
@@ -55,13 +57,19 @@ func main() {
 	authGroup := app.Group("/api/v1/auth")
 	auth.RegisterRoutes(authGroup, authSvc)
 
-	// Protected route
+	// Protected route (me)
 	authGroup.Get("/me", middleware.AuthRequired(), func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"email": c.Locals("user_email"),
 			"id":    c.Locals("user_sub"),
 		})
 	})
+
+	// Profile routes (protected)
+	profileGroup := app.Group("/api/v1/profile", middleware.AuthRequired())
+	profileHandler := auth.NewHandler(authSvc)
+	profileGroup.Get("/", profileHandler.GetProfile)
+	profileGroup.Put("/", profileHandler.UpdateProfile)
 
 	// Swagger endpoint
 	app.Get("/swagger/*", swagger.HandlerDefault)
