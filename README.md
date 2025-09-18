@@ -78,3 +78,125 @@ SIGINT/SIGTERM → shutdown server and close DB.
 
 ## Disclaimer
 Dev fallback JWT secret is insecure; ensure `JWT_SECRET` set in production.
+
+### System Context Diagram
+```mermaid
+flowchart LR
+    subgraph ClientSide[Client / Developer]
+        U[User / Client App]
+        SW[Swagger UI]
+    end
+
+    subgraph Backend[Go Fiber API]
+        H[HTTP Handlers]
+        MW[Auth Middleware]
+        SVC[Auth & Profile Service]
+        JWT[JWT Library]
+        GORM[GORM]
+    end
+
+    DB[(SQLite)]
+
+    U -- REST Calls --> H
+    SW -- Try APIs --> H
+    H --> MW
+    MW --> SVC
+    SVC --> GORM --> DB
+    SVC --> JWT
+    JWT -- Validate --> MW
+```
+คำอธิบาย: ผู้ใช้และ Swagger UI เรียก API → Handlers → Middleware ตรวจ Token → Service จัดการ Logic → GORM เข้าถึง DB และใช้ JWT สำหรับสร้าง/ตรวจสอบ Token.
+
+### Sequence Diagram: Register
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant A as Fiber API
+    participant S as Service
+    participant DB as SQLite
+    participant B as Bcrypt
+
+    C->>A: POST /auth/register (email,password)
+    A->>S: Validate input
+    S->>DB: Query existing email
+    DB-->>S: none
+    S->>B: Hash password
+    B-->>S: hash
+    S->>DB: Insert user
+    DB-->>S: user (id, timestamps)
+    S-->>A: RegisterOutput
+    A-->>C: 201 Created
+```
+
+### Sequence Diagram: Login
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant A as Fiber API
+    participant S as Service
+    participant DB as SQLite
+    participant J as JWT
+
+    C->>A: POST /auth/login
+    A->>S: Validate credentials
+    S->>DB: Load user by email
+    DB-->>S: user + hash
+    S->>S: Compare hash
+    S->>J: Generate token (sub,email,exp)
+    J-->>S: JWT string
+    S-->>A: LoginOutput
+    A-->>C: 200 OK (access_token)
+```
+
+### Sequence Diagram: Get Profile
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant A as Fiber API
+    participant M as Middleware
+    participant S as Service
+    participant DB as SQLite
+    participant J as JWT
+
+    C->>A: GET /profile (Bearer token)
+    A->>M: AuthRequired
+    M->>J: Parse token
+    J-->>M: Claims(sub,email)
+    M->>S: GetProfile(sub)
+    S->>DB: SELECT user
+    DB-->>S: user
+    S-->>A: ProfileResponse
+    A-->>C: 200 OK
+```
+
+### Sequence Diagram: Update Profile
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant A as Fiber API
+    participant M as Middleware
+    participant S as Service
+    participant DB as SQLite
+
+    C->>A: PUT /profile {first_name,phone?}
+    A->>M: AuthRequired
+    M->>S: UpdateProfile(sub,payload)
+    S->>DB: SELECT user
+    DB-->>S: user
+    S->>S: Validate & normalize
+    S->>DB: UPDATE editable fields
+    DB-->>S: updated user
+    S-->>A: ProfileResponse
+    A-->>C: 200 OK
+```
+
+### Future Diagram Extensions
+- Refresh Token Flow
+- Password Reset Activity Diagram
+- C4 Container Diagram (เมื่อมี external services)
+
+---
