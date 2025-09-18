@@ -147,8 +147,33 @@ func (h *Handler) UpdateProfile(c *fiber.Ctx) error {
 	return c.JSON(prof)
 }
 
+// Me godoc
+// @Summary Get current user
+// @Tags Auth
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {object} MeOutput
+// @Failure 401 {object} ErrorResponse
+// @Router /api/v1/auth/me [get]
+func (h *Handler) Me(c *fiber.Ctx) error {
+	idStr := c.Locals("user_sub")
+	if idStr == nil {
+		return writeError(c, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized")
+	}
+	uid, err := strconv.ParseUint(idStr.(string), 10, 64)
+	if err != nil {
+		return writeError(c, http.StatusUnauthorized, "UNAUTHORIZED", "unauthorized")
+	}
+	out, err := h.svc.Me(uint(uid))
+	if err != nil {
+		return writeError(c, http.StatusInternalServerError, "INTERNAL_ERROR", "internal error")
+	}
+	return c.JSON(out)
+}
+
 func RegisterRoutes(r fiber.Router, svc *Service) {
 	h := NewHandler(svc)
 	r.Post("/register", h.Register)
 	r.Post("/login", h.Login)
+	r.Get("/me", h.Me)
 }

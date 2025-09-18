@@ -56,14 +56,9 @@ func main() {
 	authSvc := auth.NewService()
 	authGroup := app.Group("/api/v1/auth")
 	auth.RegisterRoutes(authGroup, authSvc)
-
+	authHandler := auth.NewHandler(authSvc)
 	// Protected route (me)
-	authGroup.Get("/me", middleware.AuthRequired(), func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"email": c.Locals("user_email"),
-			"id":    c.Locals("user_sub"),
-		})
-	})
+	authGroup.Get("/me", middleware.AuthRequired(), authHandler.Me)
 
 	// Profile routes (protected)
 	profileGroup := app.Group("/api/v1/profile", middleware.AuthRequired())

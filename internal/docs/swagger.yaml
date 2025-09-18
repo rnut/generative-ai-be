@@ -26,6 +26,15 @@ definitions:
       token_type:
         type: string
     type: object
+  auth.MeOutput:
+    properties:
+      email:
+        type: string
+      id:
+        type: integer
+      last_login_at:
+        type: string
+    type: object
   auth.ProfileResponse:
     properties:
       created_at:
@@ -107,6 +116,24 @@ paths:
           schema:
             $ref: '#/definitions/auth.ErrorResponse'
       summary: Login user
+      tags:
+      - Auth
+  /api/v1/auth/me:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.MeOutput'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/auth.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get current user
       tags:
       - Auth
   /api/v1/auth/register:

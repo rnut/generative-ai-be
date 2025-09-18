@@ -69,6 +69,12 @@ type ProfileUpdateRequest struct {
 	Phone     *string `json:"phone"`
 }
 
+type MeOutput struct {
+	ID          uint       `json:"id"`
+	Email       string     `json:"email"`
+	LastLoginAt *time.Time `json:"last_login_at"`
+}
+
 func (s *Service) Register(input RegisterInput) (*RegisterOutput, error) {
 	if !emailRegex.MatchString(input.Email) {
 		return nil, ErrInvalidEmail
@@ -169,4 +175,13 @@ func (s *Service) UpdateProfile(userID uint, req ProfileUpdateRequest) (*Profile
 		return nil, err
 	}
 	return s.GetProfile(user.ID)
+}
+
+func (s *Service) Me(userID uint) (*MeOutput, error) {
+	d := db.MustGet()
+	var u User
+	if err := d.First(&u, userID).Error; err != nil {
+		return nil, err
+	}
+	return &MeOutput{ID: u.ID, Email: u.Email, LastLoginAt: u.LastLoginAt}, nil
 }
