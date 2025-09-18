@@ -9,3 +9,10 @@
 
 # OS
 .DS_Store
+
+# Env & Data
+.env
+/data/
+
+# Swagger generated (keep if you want to commit, comment out to include)
+# internal/docs/*
