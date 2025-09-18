@@ -15,6 +15,8 @@ import (
 	"github.com/gofiber/swagger"
 	_ "github.com/gofiber/swagger" // swagger handler
 
+	"github.com/joho/godotenv"
+
 	"workshop-be/internal/auth"
 	"workshop-be/internal/db"
 	"workshop-be/internal/middleware"
@@ -27,6 +29,8 @@ import (
 // @schemes http
 
 func main() {
+	_ = godotenv.Load() // load .env if present
+
 	app := fiber.New()
 	app.Use(logger.New())
 
@@ -40,7 +44,8 @@ func main() {
 	dbPath := os.Getenv("DB_PATH")
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		log.Fatal("JWT_SECRET not set")
+		log.Println("warning: JWT_SECRET not set, using insecure default (dev only)")
+		os.Setenv("JWT_SECRET", "insecure-dev-secret-change-me")
 	}
 	// init database
 	db.Init(dbPath, &auth.User{})
